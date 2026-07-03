@@ -26,66 +26,114 @@
 // responsive breaks
 $mobile-break: 575.98px;
 
+// --- Cubizor design tokens (blocky monolith language) --------------------------
+// Minimalist + bold: floating cream cards, one amber accent, soft primary-tinted
+// "monolith" shadows, small blocky radii, voxel texture. Mirrors the main site.
+$cz-radius:      0.6em;   // cards / panels
+$cz-radius-sm:   0.3em;   // rows / small controls
+$cz-gap:         0.4em;   // gap between floating controls
+$cz-shadow-panel: 0 24px 48px -14px rgba(141, 79, 4, 0.26), 0 6px 16px rgba(29, 27, 25, 0.10);
+$cz-shadow-float: 0 12px 26px -10px rgba(141, 79, 4, 0.22), 0 3px 8px rgba(29, 27, 25, 0.08);
+// Frosted-glass blur for floating panels (both prefixes for Safari)
+$cz-glass-blur: saturate(150%) blur(14px);
+// Subtle voxel/hex weave — same motif as the site's .voxel-pattern
+$cz-voxel: url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M30 0l30 15v30L30 60 0 45V15z' fill-opacity='0.06' fill='%238d4f04'/%3E%3C/svg%3E");
+
 // themes
+// --- Cubizor brand theme -------------------------------------------------------
+// All three BlueMap themes map to the Cubizor cream/amber Material-3 palette + Plus
+// Jakarta Sans, so the map UI matches the main site's design language regardless of
+// which theme is active. Values mirror src/app/globals.css on the frontend.
+
 @mixin dark-theme {
-  font-family: 'Quicksand', sans-serif;
-  font-size: 16px;
-  font-weight: 400;
-
-  --theme-bg: #181818;
-  --theme-bg-hover: #222;
-  --theme-bg-light: #444;
-  --theme-fg: #fff;
-  --theme-fg-light: #aaa;
-
-  //SwitchButton
-  --theme-switch-button-on: #00489d;
-
-  //DayNightSwitch
-  --theme-stars-day: #fff;
-  --theme-moon-day: #ff0;
-  --theme-stars-night: #444;
-  --theme-moon-night: #000;
-}
-
-@mixin light-theme {
-  font-family: 'Quicksand', sans-serif;
+  font-family: 'Plus Jakarta Sans', 'Quicksand', sans-serif;
   font-size: 16px;
   font-weight: 500;
 
-  --theme-bg: #eee;
-  --theme-bg-hover: #ddd;
-  --theme-bg-light: #999;
-  --theme-fg: #000;
-  --theme-fg-light: #333;
+  --theme-bg: #f8f3ee;          // surface-container-low
+  --theme-bg-hover: #ece7e2;    // surface-container-high
+  --theme-bg-light: #d8c3b3;    // outline-variant
+  --theme-fg: #1d1b19;          // on-surface
+  --theme-fg-light: #534438;    // on-surface-variant
 
   //SwitchButton
-  --theme-switch-button-on: #6593dc;
+  --theme-switch-button-on: #8d4f04;  // primary
+
+  //Cubizor accents
+  --theme-accent: #8d4f04;            // primary
+  --theme-accent-fg: #ffffff;         // on-primary
+  --theme-accent-container: #ffe1c7;  // soft amber wash (selection)
+
+  //Frosted glass (translucent cream over the map)
+  --theme-glass: rgba(248, 243, 238, 0.72);
+  --theme-glass-strong: rgba(248, 243, 238, 0.86);
+  --theme-glass-border: rgba(255, 255, 255, 0.55);
 
   //DayNightSwitch
-  --theme-stars-day: #444;
-  --theme-moon-day: #000;
-  --theme-stars-night: #fff;
-  --theme-moon-night: #ff0;
+  --theme-stars-day: #6c3a00;
+  --theme-moon-day: #8d4f04;
+  --theme-stars-night: #ffdcc1;
+  --theme-moon-night: #ffad60;
+}
+
+@mixin light-theme {
+  font-family: 'Plus Jakarta Sans', 'Quicksand', sans-serif;
+  font-size: 16px;
+  font-weight: 500;
+
+  --theme-bg: #fdf9f4;          // surface
+  --theme-bg-hover: #f2ede8;    // surface-container
+  --theme-bg-light: #d8c3b3;    // outline-variant
+  --theme-fg: #1d1b19;
+  --theme-fg-light: #534438;
+
+  //SwitchButton
+  --theme-switch-button-on: #8d4f04;
+
+  //Cubizor accents
+  --theme-accent: #8d4f04;
+  --theme-accent-fg: #ffffff;
+  --theme-accent-container: #ffe8d4;
+
+  //Frosted glass
+  --theme-glass: rgba(253, 249, 244, 0.72);
+  --theme-glass-strong: rgba(253, 249, 244, 0.86);
+  --theme-glass-border: rgba(255, 255, 255, 0.6);
+
+  //DayNightSwitch
+  --theme-stars-day: #6c3a00;
+  --theme-moon-day: #8d4f04;
+  --theme-stars-night: #ffdcc1;
+  --theme-moon-night: #ffad60;
 }
 
 @mixin contrast-theme {
-  font-family: 'Quicksand', sans-serif;
+  font-family: 'Plus Jakarta Sans', 'Quicksand', sans-serif;
   font-size: 16px;
-  font-weight: 400;
+  font-weight: 600;
 
-  --theme-bg: #000;
-  --theme-bg-hover: #222;
-  --theme-bg-light: #666;
-  --theme-fg: #fff;
-  --theme-fg-light: #aaa;
+  --theme-bg: #ffffff;
+  --theme-bg-hover: #f2ede8;
+  --theme-bg-light: #857466;    // outline
+  --theme-fg: #000000;
+  --theme-fg-light: #3f3128;
 
   //SwitchButton
-  --theme-switch-button-on: #006fff;
+  --theme-switch-button-on: #6c3a00;  // on-primary-container
+
+  //Cubizor accents
+  --theme-accent: #6c3a00;
+  --theme-accent-fg: #ffffff;
+  --theme-accent-container: #ffd2ab;
+
+  //Frosted glass — near-opaque for AA contrast in the high-contrast theme
+  --theme-glass: rgba(255, 255, 255, 0.92);
+  --theme-glass-strong: rgba(255, 255, 255, 0.97);
+  --theme-glass-border: rgba(133, 116, 102, 0.5);
 
   //DayNightSwitch
-  --theme-stars-day: #fff;
-  --theme-moon-day: #ff0;
-  --theme-stars-night: #444;
-  --theme-moon-night: #000;
+  --theme-stars-day: #3f3128;
+  --theme-moon-day: #8d4f04;
+  --theme-stars-night: #ffdcc1;
+  --theme-moon-night: #ffad60;
 }

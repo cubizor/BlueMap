@@ -23,6 +23,9 @@
  * THE SOFTWARE.
  */
 
+// Cubizor brand font (matches the main site). Kept first so it's a valid CSS @import.
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap');
+
 @font-face {
   font-family: 'Quicksand';
   font-style: normal;
@@ -187,3 +190,210 @@ input {
 }
 
 @import "markers.scss";
+
+// ============================================================================
+//  Cubizor redesign — "blocky monolith" design language
+//  ---------------------------------------------------------------------------
+//  A full restyle (not just a recolor) of the stock BlueMap UI to match the
+//  main site: floating cream cards, a single amber accent, soft primary-tinted
+//  monolith shadows, blocky radii, voxel texture, uppercase spaced titles and
+//  tactile amber press feedback. Every BlueMap component style is GLOBAL (no
+//  `scoped`), so we win the cascade by prefixing with `#app` (adds an id to the
+//  specificity — beats the components' plain class selectors) and by living at
+//  the end of the imported global stylesheet.
+// ============================================================================
+
+// Global scrollbar — amber thumb (signature)
+::-webkit-scrollbar {
+  width: 0.55em;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--theme-accent);
+  border-radius: 1em;
+  border: solid var(--theme-bg) 0.12em;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--theme-moon-night);
+}
+
+#app {
+  font-weight: 500;
+  letter-spacing: 0.005em;
+
+  // ---- floating control bar: separate rounded tiles, not one glued strip ----
+  .control-bar {
+    height: 2.2em;
+    gap: $cz-gap;
+    margin: 0.6em;
+    width: calc(100% - 1.2em);
+    filter: none;                       // replaced by per-tile monolith shadows
+
+    > :not(:first-child) { border-left: none; }   // drop the 1px glue seams
+
+    .svg-button,
+    .menu-button,
+    .compass,
+    .pos-input {
+      height: 100%;
+      border-radius: $cz-radius;
+      box-shadow: $cz-shadow-float;
+      overflow: hidden;
+    }
+
+    // wider gaps between the right-side controls so they're not cramped
+    .space { width: 1em; background: none; }
+    .space.greedy { flex-grow: 1; }
+
+    // split the perspective/flat/free view switch into separate tiles
+    .controls-switch { gap: $cz-gap; }
+
+    @media (max-width: $mobile-break) {
+      margin: 0;
+      width: 100%;
+      height: 2.6em;
+      gap: 0;
+      background-color: var(--theme-bg);
+      border-bottom: 2px solid var(--theme-accent);
+      .svg-button, .menu-button, .compass, .pos-input {
+        border-radius: 0;
+        box-shadow: none;
+      }
+    }
+  }
+
+  // ---- icon buttons: blocky, amber hover/press ------------------------------
+  .svg-button {
+    border-radius: $cz-radius-sm;
+    transition: background-color 120ms ease, color 120ms ease, transform 100ms ease;
+
+    &:hover { background-color: var(--theme-bg-hover); }
+
+    &.active {
+      background-color: var(--theme-accent);
+      svg { fill: var(--theme-accent-fg); }
+    }
+
+    &:active {
+      background-color: var(--theme-accent);
+      transform: translateY(1px);       // tactile press (site's block-press feel)
+      svg { fill: var(--theme-accent-fg); }
+    }
+  }
+
+  // ---- zoom buttons: one rounded floating pill ------------------------------
+  #zoom-buttons {
+    width: 2.2em;
+    margin: 0.8em;
+    filter: none;
+    border-radius: $cz-radius;
+    overflow: hidden;
+    box-shadow: $cz-shadow-float;
+
+    .svg-button { border-radius: 0; }
+    .svg-button + .svg-button { border-top: 1px solid var(--theme-bg-light); }
+  }
+
+  // ---- side menu: a floating monolith card with an amber spine ---------------
+  .side-menu {
+    max-width: 19em;
+    margin: 0.6em;
+    height: calc(100% - 1.2em);
+    border-radius: $cz-radius;
+    overflow: hidden;
+    filter: none;
+    box-shadow: $cz-shadow-panel;   // soft monolith shadow (site's .shadow-monolith)
+
+    > .menu-button {
+      border-radius: $cz-radius-sm;
+      overflow: hidden;
+    }
+
+    > .title {
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.12em;
+      font-size: 0.8em;
+      line-height: 3em;
+      padding: 0 0.5em;
+      color: var(--theme-fg);
+      background-color: var(--theme-bg);      // solid cream, no texture
+      border-bottom: 2px solid var(--theme-accent);
+    }
+
+    // list rows — rounded, quiet by default, amber when active/selected
+    .simple-button,
+    .switch-button,
+    .slider,
+    .map-button {
+      margin: 2px 0;
+      border-radius: $cz-radius-sm;
+      transition: background-color 120ms ease, box-shadow 120ms ease, color 120ms ease;
+    }
+
+    .simple-button:hover,
+    .switch-button:hover,
+    .slider:hover,
+    .map-button:hover {
+      background-color: var(--theme-bg-hover);
+    }
+
+    // selected map / active submenu row → amber-container fill + amber underline
+    // (the site's active-item language: bg-primary-container + border-bottom-primary).
+    // inset box-shadow instead of border-bottom avoids row reflow.
+    .map-button.selected,
+    .simple-button.active {
+      background-color: var(--theme-accent-container);
+      box-shadow: inset 0 -3px 0 var(--theme-accent);
+      color: var(--theme-fg);
+    }
+
+    .simple-button:active {
+      background-color: var(--theme-accent);
+      color: var(--theme-accent-fg);
+      > .submenu-icon > svg { fill: var(--theme-accent-fg); }
+    }
+
+    // grouped sections — blocky, uppercase caption
+    .group {
+      border-radius: $cz-radius-sm;
+      border-color: var(--theme-bg-light);
+
+      > .title {
+        text-transform: uppercase;
+        letter-spacing: 0.1em;
+        font-size: 0.78em;
+        font-weight: 700;
+        background-color: var(--theme-bg);
+      }
+    }
+
+    // range sliders — amber thumb
+    .slider > label > input {
+      &::-webkit-slider-thumb {
+        background-color: var(--theme-accent);
+        border-color: var(--theme-accent);
+      }
+      &::-moz-range-thumb {
+        background-color: var(--theme-accent);
+        border-color: var(--theme-accent);
+      }
+    }
+
+    @media (max-width: $mobile-break) {
+      margin: 0;
+      max-width: 100%;
+      height: 100%;
+      border-radius: 0;
+      border-left: none;
+      > .title { line-height: 2.6em; }
+    }
+  }
+
+  // loading / state message — quiet, spaced
+  .map-state-message {
+    text-transform: uppercase;
+    letter-spacing: 0.14em;
+    font-size: 0.9em;
+    font-weight: 600;
+  }
+}
