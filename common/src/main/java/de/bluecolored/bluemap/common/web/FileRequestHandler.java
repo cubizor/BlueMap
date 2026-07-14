@@ -140,8 +140,15 @@ public class FileRequestHandler implements HttpRequestHandler {
                 .ofEpochMilli(lastModified)
                 .atOffset(ZoneOffset.UTC)
         ));
-        response.addHeader("Cache-Control", "public");
-        response.addHeader("Cache-Control", "max-age=" + TimeUnit.DAYS.toSeconds(1));
+        // entry-point files change with every webapp deploy and are not fingerprinted like the
+        // vite assets — force revalidation (cheap 304 via the ETag above) instead of a 24h cache
+        String fileName = filePath.getFileName().toString();
+        if (fileName.equals("index.html") || fileName.equals("settings.json") || fileName.endsWith(".conf")) {
+            response.addHeader("Cache-Control", "no-cache");
+        } else {
+            response.addHeader("Cache-Control", "public");
+            response.addHeader("Cache-Control", "max-age=" + TimeUnit.DAYS.toSeconds(1));
+        }
 
         //add content type header
         String filetype = filePath.getFileName().toString();

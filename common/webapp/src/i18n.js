@@ -26,7 +26,7 @@ export async function setLanguage(lang) {
 async function loadLanguage(lang) {
 	try {
 		if (!i18n.availableLocales.includes(lang)) {
-			let messages = await fetchHocon(`./lang/${lang}.conf`);
+			let messages = await fetchHocon(`./lang/${lang}.conf?v=${__LANG_CACHE_BUST__}`);
 			i18n.setLocaleMessage(lang, messages);
 		}
 	} catch (e) {
@@ -35,7 +35,7 @@ async function loadLanguage(lang) {
 }
 
 export async function loadLanguageSettings() {
-	let settings = await fetchHocon(`./lang/settings.conf`);
+	let settings = await fetchHocon(`./lang/settings.conf?v=${__LANG_CACHE_BUST__}`);
 	let selectedLanguage = null;
 
 	if (settings.useBrowserLanguage) {
