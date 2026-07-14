@@ -15,7 +15,8 @@
           <div class="switch" :class="{on: playerSet.visible}"></div>
         </div>
         <div class="search">
-          <input type="text" v-model="search" :placeholder="$t('filters.searchPlayer')">
+          <input type="text" v-model="search" :placeholder="$t('filters.searchPlayer')"
+                 @keydown.stop @keyup.stop>
         </div>
         <div class="player-list" v-if="search">
           <div v-if="!matchedPlayers.length" class="empty">{{ $t("filters.noPlayers") }}</div>
