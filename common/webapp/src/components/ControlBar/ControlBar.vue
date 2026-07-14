@@ -2,7 +2,9 @@
   <div class="control-bar">
     <!-- Cubizor: single fixed map — the main menu, map-switcher and marker/player
          list buttons are intentionally removed. Player heads + POI markers still
-         render on the map itself; only the slide-out list panels are gone. -->
+         render on the map itself; only the slide-out list panels are gone.
+         Marker-set toggles live in the FilterMenu below instead. -->
+    <FilterMenu v-if="showMapMenu" />
     <div class="space thin-hide greedy"></div>
     <DayNightSwitch v-if="showMapMenu" class="thin-hide" :title="$t('lighting.dayNightSwitch.tooltip')" />
     <div class="space thin-hide"></div>
@@ -27,10 +29,12 @@
   import DayNightSwitch from "./DayNightSwitch.vue";
   import ControlsSwitch from "./ControlsSwitch.vue";
   import SvgButton from "./SvgButton.vue";
+  import FilterMenu from "./FilterMenu.vue";
 
   export default {
     name: "ControlBar",
     components: {
+      FilterMenu,
       SvgButton,
       ControlsSwitch,
       DayNightSwitch,
