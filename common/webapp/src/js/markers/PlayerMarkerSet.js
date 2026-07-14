@@ -26,6 +26,7 @@
 import {MarkerSet} from "./MarkerSet";
 import {alert} from "../util/Utils";
 import {PlayerMarker} from "./PlayerMarker";
+import {getLocalStorage} from "../Utils";
 
 export class PlayerMarkerSet extends MarkerSet {
 
@@ -36,6 +37,11 @@ export class PlayerMarkerSet extends MarkerSet {
         this.data.defaultHide = false;
 
         this.data.playerheadsUrl = playerheadsUrl;
+
+        // MarkerSet's constructor restores the stored visibility only for toggleable sets, and this
+        // set becomes toggleable a few lines above — after super() already ran. So restore here.
+        let storedVisible = getLocalStorage(this.localStorageKey("visible"));
+        if (storedVisible !== undefined) this.visible = !!storedVisible;
     }
 
     updateFromPlayerData(data) {
