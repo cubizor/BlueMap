@@ -44,6 +44,16 @@
       filter: drop-shadow(1px 1px 3px #0008);
     }
 
+    // POI icons render at their source pixel size regardless of zoom (no CSS scaling by default),
+    // so hi-res marker art (volcano-feed's 32x32 Minecraft textures) reads oversized next to the
+    // default pin at low zoom. Constrain those to a fixed on-screen size — keep in sync with
+    // ICON_SIZE in bluemap-sharded/deploy/volcano-feed.py, which anchors on this same value.
+    .volcano-marker-icon {
+      width: 20px;
+      height: 20px;
+      image-rendering: pixelated;
+    }
+
     &.bm-marker-highlight {
       .bm-marker-poi-label {
         opacity: 1;

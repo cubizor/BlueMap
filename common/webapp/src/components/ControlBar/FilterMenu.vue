@@ -32,12 +32,27 @@
         <span class="row-label">{{ set.label }}</span>
         <div class="switch" :class="{on: set.visible}"></div>
       </div>
+
+      <template v-if="netherRegionSet || customRegionSet">
+        <div class="group-title">{{ $t("filters.regions") }}</div>
+        <div v-if="netherRegionSet" class="filter-row" @click="toggle(netherRegionSet)">
+          <span class="row-label">{{ $t("filters.showNetherRegions") }}</span>
+          <div class="switch" :class="{on: netherRegionSet.visible}"></div>
+        </div>
+        <div class="filter-row" :class="{disabled: !customRegionSet}"
+             @click="customRegionSet && toggle(customRegionSet)">
+          <span class="row-label">{{ $t("filters.showCustomRegions") }}</span>
+          <div class="switch" :class="{on: customRegionSet && customRegionSet.visible}"></div>
+        </div>
+      </template>
     </div>
   </div>
 </template>
 
 <script>
 const PLAYER_SET_ID = "bm-players";
+const NETHER_REGION_SET_ID = "region-nether";
+const CUSTOM_REGION_SET_ID = "region-custom";
 
 export default {
   name: "FilterMenu",
@@ -56,6 +71,12 @@ export default {
     },
     playerSet() {
       return this.markers.markerSets.find(set => set.id === PLAYER_SET_ID);
+    },
+    netherRegionSet() {
+      return this.markers.markerSets.find(set => set.id === NETHER_REGION_SET_ID);
+    },
+    customRegionSet() {
+      return this.markers.markerSets.find(set => set.id === CUSTOM_REGION_SET_ID);
     },
     matchedPlayers() {
       if (!this.playerSet) return [];
@@ -186,6 +207,15 @@ export default {
 
       &:hover {
         background-color: var(--theme-bg-hover);
+      }
+
+      &.disabled {
+        cursor: default;
+        opacity: 0.5;
+
+        &:hover {
+          background-color: transparent;
+        }
       }
 
       .row-label {
