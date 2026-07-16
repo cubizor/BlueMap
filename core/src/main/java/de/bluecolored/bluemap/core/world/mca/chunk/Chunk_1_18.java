@@ -56,6 +56,15 @@ public class Chunk_1_18 extends MCAChunk {
     private final int skyLight;
     private final int worldMinY;
 
+    /**
+     * Highest section-y that carries a SkyLight array. Vanilla omits the arrays of sections whose
+     * sky-light is implicit: everything <i>above</i> the topmost stored array is fully sky-lit,
+     * everything below is dark. World-gen/conversion tools rely on that convention (they often
+     * store exactly one array, at the surface section) — treating a missing array as 0 instead
+     * renders the surface pitch-black whenever the air above it falls into an array-less section.
+     */
+    private final int topSkyLightSectionY;
+
     private final boolean hasWorldSurfaceHeights;
     private final PackedIntArrayAccess worldSurfaceHeights;
     private final boolean hasOceanFloorHeights;
@@ -70,7 +79,11 @@ public class Chunk_1_18 extends MCAChunk {
         super(world, data);
 
         this.generated = !STATUS_EMPTY.equals(data.status);
-        this.hasLightData = STATUS_FULL.equals(data.status);
+        // isLightOn=0 means the server saved the chunk before (re)computing light — whatever light
+        // arrays remain are stale (modern Paper/Folia persist all player-loaded chunks like this).
+        // Rendering them anyway bakes wrong shading into the map, so treat them as light-less and
+        // let the missing-light handling decide (skip, or fully-lit via ignore-missing-light-data).
+        this.hasLightData = STATUS_FULL.equals(data.status) && data.lightOn;
         this.inhabitedTime = data.inhabitedTime;
 
         DimensionType dimensionType = getWorld().getDimensionType();
@@ -87,6 +100,7 @@ public class Chunk_1_18 extends MCAChunk {
         this.hasOceanFloorHeights = this.oceanFloorHeights.isCorrectSize(VALUES_PER_HEIGHTMAP);
 
         SectionData[] sectionsData = data.sections;
+        int topSkyLightSection = Integer.MIN_VALUE;
         if (sectionsData != null && sectionsData.length > 0) {
             int min = Integer.MAX_VALUE;
             int max = Integer.MIN_VALUE;
@@ -96,6 +110,7 @@ public class Chunk_1_18 extends MCAChunk {
                 int y = sectionData.getY();
                 if (min > y) min = y;
                 if (max < y) max = y;
+                if (sectionData.skyLight.length > 0 && y > topSkyLightSection) topSkyLightSection = y;
             }
 
             // load sections into ordered array
@@ -117,6 +132,7 @@ public class Chunk_1_18 extends MCAChunk {
             this.sectionMin = 0;
             this.sectionMax = 0;
         }
+        this.topSkyLightSectionY = topSkyLightSection;
 
         // load block-entities
         this.blockEntities = new HashMap<>(data.blockEntities.length);
@@ -168,7 +184,9 @@ public class Chunk_1_18 extends MCAChunk {
         Section section = getSection(sectionY);
         if (section == null) return (sectionY < sectionMin) ? target.set(0, 0) : target.set(skyLight, 0);
 
-        return section.getLightData(x, y, z, target);
+        // vanilla convention: sections above the topmost stored SkyLight array are implicitly
+        // fully sky-lit, sections at/below it default to dark (see topSkyLightSectionY)
+        return section.getLightData(x, y, z, target, sectionY > topSkyLightSectionY ? skyLight : 0);
     }
 
     @Override
@@ -272,15 +290,15 @@ public class Chunk_1_18 extends MCAChunk {
             return biomePalette[id];
         }
 
-        public LightData getLightData(int x, int y, int z, LightData target) {
-            if (blockLight.length == 0 && skyLight.length == 0) return target.set(0, 0);
+        public LightData getLightData(int x, int y, int z, LightData target, int missingSkyLight) {
+            if (blockLight.length == 0 && skyLight.length == 0) return target.set(missingSkyLight, 0);
 
             int blockByteIndex = (y & 0xF) << 8 | (z & 0xF) << 4 | x & 0xF;
             int blockHalfByteIndex = blockByteIndex >> 1; // blockByteIndex / 2
             boolean largeHalf = (blockByteIndex & 0x1) != 0; // (blockByteIndex % 2) == 0
 
             return target.set(
-                    this.skyLight.length > blockHalfByteIndex ? MCAUtil.getByteHalf(this.skyLight[blockHalfByteIndex], largeHalf) : 0,
+                    this.skyLight.length > blockHalfByteIndex ? MCAUtil.getByteHalf(this.skyLight[blockHalfByteIndex], largeHalf) : missingSkyLight,
                     this.blockLight.length > blockHalfByteIndex ? MCAUtil.getByteHalf(this.blockLight[blockHalfByteIndex], largeHalf) : 0
             );
         }
@@ -297,6 +315,10 @@ public class Chunk_1_18 extends MCAChunk {
 
         @NBTName("Status")
         private Key status = STATUS_EMPTY;
+
+        // absent on old/tool-generated chunks -> assume the stored light is valid
+        @NBTName("isLightOn")
+        private boolean lightOn = true;
 
         @NBTName("InhabitedTime")
         private long inhabitedTime = 0;
