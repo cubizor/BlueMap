@@ -110,11 +110,12 @@ public class MapUpdateService extends Thread {
                 synchronized (MapUpdateService.this) {
                     WorldRegionUpdateTask task = new WorldRegionUpdateTask(map, regionPos);
                     scheduledUpdates.remove(regionPos);
-                    // Preempt: insert right after the current task instead of at the tail. A live
-                    // edit must render promptly even while a long background (re)render is in the
-                    // queue — on the sharded setup that background pass fetches every region over
-                    // HTTP and runs for days, so a tail-scheduled update would never be reached.
-                    renderManager.scheduleRenderTaskNext(task);
+                    // Priority lane: a live edit must render promptly even while a long background
+                    // (re)render occupies the queue head. On the sharded setup that background pass
+                    // fetches every region over HTTP and runs for days; a normally-scheduled update
+                    // (even "next") never runs until it completes, because all workers cooperate on
+                    // the head task. scheduleRenderTaskUrgent runs this region on its own worker.
+                    renderManager.scheduleRenderTaskUrgent(task);
                     lastUpdateTimes.put(regionPos, System.currentTimeMillis());
 
                     verboseLog.accept("Scheduled update for region-file: " + regionPos + " (Map: " + map.getId() + ")");

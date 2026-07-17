@@ -47,6 +47,14 @@ public class RenderManager {
     private volatile boolean newTask;
 
     private final LinkedList<RenderTask> renderTasks;
+    /**
+     * Priority lane for small, latency-sensitive tasks (live region updates from the map-watch).
+     * A worker checks this before the normal queue and runs one task to completion on its own,
+     * so an in-game edit re-renders within seconds even while a long-running full (re)render sits
+     * at the head of {@link #renderTasks}. Kept separate from the cooperative busyCount machinery:
+     * each urgent task is a single region, cheap enough for one thread to finish alone.
+     */
+    private final java.util.concurrent.ConcurrentLinkedDeque<RenderTask> urgentTasks;
     private final Map<RenderTask, Long> completedTasks;
 
     public RenderManager() {
@@ -63,6 +71,7 @@ public class RenderManager {
         this.newTask = true;
 
         this.renderTasks = new LinkedList<>();
+        this.urgentTasks = new java.util.concurrent.ConcurrentLinkedDeque<>();
         this.completedTasks = new LinkedHashMap<>() {
             @Override
             protected boolean removeEldestEntry(Map.Entry<RenderTask, Long> eldest) {
@@ -157,6 +166,18 @@ public class RenderManager {
                 if (scheduleRenderTask(task)) count++;
             }
             return count;
+        }
+    }
+
+    /**
+     * Schedule a task on the priority lane: a worker runs it to completion before pulling more work
+     * from the normal queue. Use for small, latency-sensitive tasks (live region updates) that must
+     * not wait behind a long-running full (re)render. See {@link #urgentTasks}.
+     */
+    public void scheduleRenderTaskUrgent(RenderTask task) {
+        urgentTasks.add(task);
+        synchronized (this.renderTasks) {
+            renderTasks.notifyAll(); // wake idle workers waiting on an empty normal queue
         }
     }
 
@@ -303,9 +324,28 @@ public class RenderManager {
     private void doWork() throws Exception {
         RenderTask task;
 
+        // Priority lane: a live region update jumps ahead of the (possibly multi-day) full render
+        // at the head of the normal queue. One worker runs it to completion on its own — a single
+        // region is cheap — so an in-game edit re-renders in seconds instead of waiting for the
+        // whole backlog. Independent of the cooperative busyCount used for normal tasks.
+        RenderTask urgent = this.urgentTasks.poll();
+        if (urgent != null) {
+            try {
+                while (urgent.hasMoreWork()) urgent.doWork();
+            } finally {
+                synchronized (this.renderTasks) {
+                    this.completedTasks.put(urgent, System.currentTimeMillis());
+                }
+            }
+            return;
+        }
+
         synchronized (this.renderTasks) {
-            while (this.renderTasks.isEmpty())
+            while (this.renderTasks.isEmpty() && this.urgentTasks.isEmpty())
                 this.renderTasks.wait(10000);
+
+            // an urgent task arrived while we waited on an empty normal queue — re-enter to run it
+            if (!this.urgentTasks.isEmpty()) return;
 
             task = this.renderTasks.getFirst();
             if (this.newTask) {
