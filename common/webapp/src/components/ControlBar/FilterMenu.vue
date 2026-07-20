@@ -27,6 +27,25 @@
         </div>
       </template>
 
+      <template v-if="kingdomSet">
+        <div class="group-title">{{ $t("filters.kingdoms") }}</div>
+        <div class="filter-row" @click="toggle(kingdomSet)">
+          <span class="row-label">{{ $t("filters.showKingdoms") }}</span>
+          <div class="switch" :class="{on: kingdomSet.visible}"></div>
+        </div>
+        <div class="search">
+          <input type="text" v-model="kingdomSearch" :placeholder="$t('filters.searchKingdom')"
+                 @keydown.stop @keyup.stop>
+        </div>
+        <div class="player-list" v-if="kingdomSearch">
+          <div v-if="!matchedKingdoms.length" class="empty">{{ $t("filters.noKingdoms") }}</div>
+          <div v-for="kingdom in matchedKingdoms" :key="kingdom.id" class="player-row"
+               @click="gotoKingdom(kingdom)">
+            <span class="row-label">{{ kingdom.label }}</span>
+          </div>
+        </div>
+      </template>
+
       <div class="group-title">{{ $t("filters.ores") }}</div>
       <div v-for="set in oreSets" :key="set.id" class="filter-row" @click="toggle(set)">
         <span class="row-label">{{ set.label }}</span>
@@ -53,6 +72,8 @@
 const PLAYER_SET_ID = "bm-players";
 const NETHER_REGION_SET_ID = "region-nether";
 const CUSTOM_REGION_SET_ID = "region-custom";
+// Published by korderline-feed.py; keep in sync with KINGDOM_SET_ID there.
+const KINGDOM_SET_ID = "korderline-kingdoms";
 
 export default {
   name: "FilterMenu",
@@ -60,6 +81,7 @@ export default {
     return {
       open: false,
       search: "",
+      kingdomSearch: "",
       markers: this.$bluemap.mapViewer.markers.data,
     }
   },
@@ -77,6 +99,24 @@ export default {
     },
     customRegionSet() {
       return this.markers.markerSets.find(set => set.id === CUSTOM_REGION_SET_ID);
+    },
+    kingdomSet() {
+      return this.markers.markerSets.find(set => set.id === KINGDOM_SET_ID);
+    },
+    // A kingdom whose provinces do not touch is published as several shape markers sharing one
+    // label, so collapse by label — otherwise one kingdom fills the result list with duplicates.
+    matchedKingdoms() {
+      if (!this.kingdomSet) return [];
+      const query = this.kingdomSearch.trim().toLowerCase();
+      if (!query) return [];
+      const byLabel = new Map();
+      for (const marker of this.kingdomSet.markers) {
+        if (marker.type !== "shape") continue;
+        const label = marker.label || "";
+        if (!label.toLowerCase().includes(query) || byLabel.has(label)) continue;
+        byLabel.set(label, marker);
+      }
+      return [...byLabel.values()].sort((a, b) => (a.label || "").localeCompare(b.label || ""));
     },
     matchedPlayers() {
       if (!this.playerSet) return [];
@@ -117,6 +157,16 @@ export default {
         cm.controls.followPlayerMarker(marker);
       }
 
+      cm.position.copy(marker.position);
+      this.open = false;
+    },
+    // Unlike Menu/MarkerItem, which silently refuses to move to a hidden marker, searching for a
+    // kingdom while the layer is off turns the layer on — a search result that does nothing when
+    // clicked just reads as broken.
+    gotoKingdom(marker) {
+      if (this.kingdomSet && !this.kingdomSet.visible) this.toggle(this.kingdomSet);
+      const cm = this.$bluemap.mapViewer.controlsManager;
+      if (cm.controls && cm.controls.stopFollowingPlayerMarker) cm.controls.stopFollowingPlayerMarker();
       cm.position.copy(marker.position);
       this.open = false;
     },
