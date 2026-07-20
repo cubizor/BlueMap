@@ -54,6 +54,10 @@ public class MapStorageRequestHandler implements HttpRequestHandler {
 
     private static final Pattern TILE_PATTERN = Pattern.compile("tiles/([\\d/]+)/x(-?[\\d/]+)z(-?[\\d/]+).*");
 
+    // Upstream serves tiles with a 1-day max-age; on a live, frequently-updated map behind a CDN
+    // that is long enough for a re-rendered tile to stay stale for a full day. Keep it short.
+    private static final long TILE_MAX_AGE_SECONDS = TimeUnit.MINUTES.toSeconds(1);
+
     private @NonNull MapStorage mapStorage;
 
     @SuppressWarnings("resource")
@@ -80,7 +84,14 @@ public class MapStorageRequestHandler implements HttpRequestHandler {
 
                 HttpResponse response = new HttpResponse(HttpStatusCode.OK);
                 response.addHeader("Cache-Control", "public");
-                response.addHeader("Cache-Control", "max-age=" + TimeUnit.DAYS.toSeconds(1));
+                // Map tiles are re-written in place whenever the world changes, but the response
+                // carries no ETag/Last-Modified, so a cached copy cannot be revalidated - it is just
+                // served until it expires. Upstream's 1-day max-age means a tile that changed (or,
+                // as we hit in prod, a void tile that got re-rendered with real terrain) stays stale
+                // for up to a day. Behind a CDN that edge-caches by this header that became visible,
+                // never-healing holes. Keep it short so any cache refreshes quickly; the webapp still
+                // force-revalidates on its own update pass on top of this.
+                response.addHeader("Cache-Control", "max-age=" + TILE_MAX_AGE_SECONDS);
 
                 if (lod == 0) response.addHeader("Content-Type", "application/octet-stream");
                 else response.addHeader("Content-Type", "image/png");
