@@ -201,7 +201,12 @@ public final class WorldRegionUpdateTask implements MapRenderTask, SerializableR
                 case RENDER -> {
                     TileState failedState = checkTileRenderPreconditions(tile);
                     if (failedState != null){
-                        map.unrenderTile(tile);
+                        // Un-rendering deletes the hires tile and clears the lowres area to void.
+                        // For CHUNK_ERROR that is destructive: we failed to *read* the chunks, so we
+                        // know nothing about what is there, and throwing away a good tile turns a
+                        // transient read error into a visible hole. Keep the stale tile and retry.
+                        if (failedState != TileState.CHUNK_ERROR)
+                            map.unrenderTile(tile);
                         yield failedState;
                     }
 

@@ -67,7 +67,19 @@ public interface TileState extends Keyed, TileActionResolver {
     TileState NOT_GENERATED = new Impl(Key.bluemap("not-generated"));
     TileState MISSING_LIGHT = new Impl(Key.bluemap("missing-light"));
     TileState LOW_INHABITED_TIME = new Impl(Key.bluemap("low-inhabited-time"));
-    TileState CHUNK_ERROR = new Impl(Key.bluemap("chunk-error"));
+
+    // A chunk-error is a failure to *read* the chunk, not a statement about the world: a truncated
+    // region-file, an I/O error, or - with a remote loader like cubizor:sharded - a fetch that failed.
+    // Those are transient, so this must retry like RENDER_ERROR does. With the default resolver it
+    // would only ever be reconsidered if the region-file changed again, which for a static region
+    // means never - one blip left a permanent hole in the map.
+    TileState CHUNK_ERROR = new Impl(Key.bluemap("chunk-error"), (changed, bounds) ->
+            switch (bounds) {
+                case INSIDE -> RENDER_RENDERED;
+                case EDGE -> RENDER_RENDERED_EDGE;
+                case OUTSIDE -> DELETE_OUT_OF_BOUNDS;
+            }
+    );
 
     TileState RENDER_ERROR = new Impl(Key.bluemap("render-error"), (changed, bounds) ->
             switch (bounds) {
