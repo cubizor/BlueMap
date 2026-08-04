@@ -58,6 +58,20 @@ public class MapStorageRequestHandler implements HttpRequestHandler {
     // that is long enough for a re-rendered tile to stay stale for a full day. Keep it short.
     private static final long TILE_MAX_AGE_SECONDS = TimeUnit.MINUTES.toSeconds(1);
 
+    // Everything under `live/` is rewritten every few seconds (player positions, marker feeds) and,
+    // like tiles, carries no ETag/Last-Modified - so a cache cannot revalidate it, it just serves
+    // its copy until it expires. Upstream's 1-day max-age therefore lets a CDN pin one snapshot for
+    // a day: in prod that surfaced as "nobody is ever online" (an empty players.json edge-cached at
+    // a quiet moment) and as live markers frozen mid-update. Short enough that no cache can hold a
+    // stale snapshot, long enough to still collapse the web-app's 1s player poll at the edge.
+    private static final long LIVE_MAX_AGE_SECONDS = 5;
+
+    // Map metadata (settings.json, textures.json, assets) only changes on a re-render or a config
+    // change, so it keeps upstream's long max-age.
+    private static final long META_MAX_AGE_SECONDS = TimeUnit.DAYS.toSeconds(1);
+
+    private static final String LIVE_PATH_PREFIX = "live/";
+
     private @NonNull MapStorage mapStorage;
 
     @SuppressWarnings("resource")
@@ -83,7 +97,6 @@ public class MapStorageRequestHandler implements HttpRequestHandler {
                 if (in == null) return new HttpResponse(HttpStatusCode.NO_CONTENT);
 
                 HttpResponse response = new HttpResponse(HttpStatusCode.OK);
-                response.addHeader("Cache-Control", "public");
                 // Map tiles are re-written in place whenever the world changes, but the response
                 // carries no ETag/Last-Modified, so a cached copy cannot be revalidated - it is just
                 // served until it expires. Upstream's 1-day max-age means a tile that changed (or,
@@ -91,7 +104,7 @@ public class MapStorageRequestHandler implements HttpRequestHandler {
                 // for up to a day. Behind a CDN that edge-caches by this header that became visible,
                 // never-healing holes. Keep it short so any cache refreshes quickly; the webapp still
                 // force-revalidates on its own update pass on top of this.
-                response.addHeader("Cache-Control", "max-age=" + TILE_MAX_AGE_SECONDS);
+                cacheFor(response, TILE_MAX_AGE_SECONDS);
 
                 if (lod == 0) response.addHeader("Content-Type", "application/octet-stream");
                 else response.addHeader("Content-Type", "image/png");
@@ -110,8 +123,9 @@ public class MapStorageRequestHandler implements HttpRequestHandler {
             };
             if (in != null){
                 HttpResponse response = new HttpResponse(HttpStatusCode.OK);
-                response.addHeader("Cache-Control", "public");
-                response.addHeader("Cache-Control", "max-age=" + TimeUnit.DAYS.toSeconds(1));
+                cacheFor(response, path.startsWith(LIVE_PATH_PREFIX)
+                        ? LIVE_MAX_AGE_SECONDS
+                        : META_MAX_AGE_SECONDS);
                 response.addHeader("Content-Type", ContentTypeRegistry.fromFileName(path));
                 writeToResponse(in, response, request);
                 return response;
@@ -124,6 +138,15 @@ public class MapStorageRequestHandler implements HttpRequestHandler {
         }
 
         return new HttpResponse(HttpStatusCode.NOT_FOUND);
+    }
+
+    /**
+     * Sets the whole Cache-Control header in one call. {@code addHeader} puts by name rather than
+     * appending, so the "public" and "max-age=..." directives have to go out together - added
+     * separately the second call silently replaces the first.
+     */
+    private void cacheFor(HttpResponse response, long maxAgeSeconds) {
+        response.addHeader("Cache-Control", "public", "max-age=" + maxAgeSeconds);
     }
 
     private void writeToResponse(CompressedInputStream data, HttpResponse response, HttpRequest request) throws IOException {
