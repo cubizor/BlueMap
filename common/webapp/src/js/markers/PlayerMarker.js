@@ -57,15 +57,39 @@ export class PlayerMarker extends Marker {
         this.playerHeadElement = this.element.getElementsByTagName("img")[0];
         this.playerNameElement = this.element.getElementsByTagName("div")[0];
 
+        this.headRetry = 0;
+        this.headRetryTimeout = null;
+
         this.addEventListener( 'removed', () => {
+            if (this.headRetryTimeout) clearTimeout(this.headRetryTimeout);
             if (this.element.parentNode) this.element.parentNode.removeChild(this.element);
         });
 
-        this.playerHeadElement.addEventListener('error', () => {
-            this.playerHeadElement.src = "assets/steve.png";
-        }, {once: true});
+        this.playerHeadElement.addEventListener('error', () => this.onPlayerHeadError());
 
         this.add(this.elementObject);
+    }
+
+    /**
+     * A player's head image is produced the first time that player is seen, so the marker can well
+     * be on the map before its head exists. Show steve.png meanwhile, but keep asking for the real
+     * one a few times - handled once-and-for-all, the player would stay Steve for the rest of their
+     * session. Give up after that so a player who genuinely has no head is not a permanent 404 loop.
+     */
+    onPlayerHeadError() {
+        this.playerHeadElement.src = "assets/steve.png";
+
+        if (this.data.playerHead === "assets/steve.png") return;  // nothing else to fall back to
+
+        const delay = PlayerMarker.HEAD_RETRY_DELAYS[this.headRetry];
+        if (delay === undefined) return;
+        this.headRetry++;
+
+        if (this.headRetryTimeout) clearTimeout(this.headRetryTimeout);
+        this.headRetryTimeout = setTimeout(() => {
+            this.headRetryTimeout = null;
+            this.playerHeadElement.src = this.data.playerHead;
+        }, delay);
     }
 
     /**
@@ -160,8 +184,13 @@ export class PlayerMarker extends Marker {
     dispose() {
         super.dispose();
 
+        if (this.headRetryTimeout) clearTimeout(this.headRetryTimeout);
+
         let element = this.elementObject.element;
         if (element.parentNode) element.parentNode.removeChild(element);
     }
 
 }
+
+/** Delays (ms) before each re-try of a player-head image that 404'd. */
+PlayerMarker.HEAD_RETRY_DELAYS = [5000, 15000, 30000];

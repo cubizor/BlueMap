@@ -70,7 +70,13 @@ public class MapStorageRequestHandler implements HttpRequestHandler {
     // change, so it keeps upstream's long max-age.
     private static final long META_MAX_AGE_SECONDS = TimeUnit.DAYS.toSeconds(1);
 
+    // Player heads are written per player rather than per render - a player whose skin changes, or
+    // who is seen for the first time, gets a new one at any moment. A day of cache would mean a
+    // changed skin does not show until tomorrow.
+    private static final long PLAYERHEAD_MAX_AGE_SECONDS = TimeUnit.MINUTES.toSeconds(10);
+
     private static final String LIVE_PATH_PREFIX = "live/";
+    private static final String PLAYERHEADS_PATH_PREFIX = "assets/playerheads/";
 
     private @NonNull MapStorage mapStorage;
 
@@ -123,9 +129,7 @@ public class MapStorageRequestHandler implements HttpRequestHandler {
             };
             if (in != null){
                 HttpResponse response = new HttpResponse(HttpStatusCode.OK);
-                cacheFor(response, path.startsWith(LIVE_PATH_PREFIX)
-                        ? LIVE_MAX_AGE_SECONDS
-                        : META_MAX_AGE_SECONDS);
+                cacheFor(response, maxAgeFor(path));
                 response.addHeader("Content-Type", ContentTypeRegistry.fromFileName(path));
                 writeToResponse(in, response, request);
                 return response;
@@ -137,7 +141,23 @@ public class MapStorageRequestHandler implements HttpRequestHandler {
             return new HttpResponse(HttpStatusCode.INTERNAL_SERVER_ERROR);
         }
 
-        return new HttpResponse(HttpStatusCode.NOT_FOUND);
+        // Not found is a *timing* answer here as often as a permanent one: a player head is written
+        // the first time that player is seen, so the web-app can ask for one moments before it
+        // exists. A CDN that caches the 404 (Cloudflare does, by default, even without a header)
+        // would keep answering "no such head" long after we wrote it.
+        HttpResponse notFound = new HttpResponse(HttpStatusCode.NOT_FOUND);
+        notFound.addHeader("Cache-Control", "no-store");
+        return notFound;
+    }
+
+    /**
+     * How long a cache may keep a piece of map metadata, by what it is: player heads change per
+     * player, everything else only on a re-render or a config change.
+     */
+    private long maxAgeFor(String path) {
+        if (path.startsWith(LIVE_PATH_PREFIX)) return LIVE_MAX_AGE_SECONDS;
+        if (path.startsWith(PLAYERHEADS_PATH_PREFIX)) return PLAYERHEAD_MAX_AGE_SECONDS;
+        return META_MAX_AGE_SECONDS;
     }
 
     /**
