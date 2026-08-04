@@ -42,6 +42,12 @@ import {reactive} from "vue";
 export class BlueMapApp {
 
     /**
+     * Bumped whenever the server-side view-distance defaults change in a way that a visitor who
+     * already has the old ones stored must not keep. See loadUserSettings().
+     */
+    static VIEW_DISTANCE_DEFAULTS_VERSION = 1;
+
+    /**
      * @param rootElement {Element}
      */
     constructor(rootElement) {
@@ -647,8 +653,19 @@ export class BlueMapApp {
         }
 
         this.mapViewer.superSampling = this.loadUserSetting("superSampling", this.mapViewer.data.superSampling);
-        this.mapViewer.data.loadedHiresViewDistance = this.loadUserSetting("hiresViewDistance", this.mapViewer.data.loadedHiresViewDistance);
-        this.mapViewer.data.loadedLowresViewDistance = this.loadUserSetting("lowresViewDistance", this.mapViewer.data.loadedLowresViewDistance);
+        // A stored view-distance is usually not a choice the visitor made - saveUserSettings()
+        // persists whatever the server defaulted to on their first load. So when those defaults
+        // change because the old ones were wrong (ours were high enough to make the browser load
+        // the entire world), a returning visitor keeps the broken value forever unless it is
+        // dropped once. Anything below the current version predates that and is discarded.
+        if (this.loadUserSetting("viewDistanceDefaults", 0) >= BlueMapApp.VIEW_DISTANCE_DEFAULTS_VERSION) {
+            this.mapViewer.data.loadedHiresViewDistance = this.clampToSlider(
+                this.loadUserSetting("hiresViewDistance", this.mapViewer.data.loadedHiresViewDistance),
+                this.settings.hiresSliderMin, this.settings.hiresSliderMax);
+            this.mapViewer.data.loadedLowresViewDistance = this.clampToSlider(
+                this.loadUserSetting("lowresViewDistance", this.mapViewer.data.loadedLowresViewDistance),
+                this.settings.lowresSliderMin, this.settings.lowresSliderMax);
+        }
         this.mapViewer.updateLoadedMapArea();
         this.appState.controls.mouseSensitivity = this.loadUserSetting("mouseSensitivity", this.appState.controls.mouseSensitivity);
         this.appState.controls.invertMouse = this.loadUserSetting("invertMouse", this.appState.controls.invertMouse);
@@ -670,6 +687,7 @@ export class BlueMapApp {
         this.saveUserSetting("resetSettings", false);
 
         this.saveUserSetting("superSampling", this.mapViewer.data.superSampling);
+        this.saveUserSetting("viewDistanceDefaults", BlueMapApp.VIEW_DISTANCE_DEFAULTS_VERSION);
         this.saveUserSetting("hiresViewDistance", this.mapViewer.data.loadedHiresViewDistance);
         this.saveUserSetting("lowresViewDistance", this.mapViewer.data.loadedLowresViewDistance);
         this.saveUserSetting("mouseSensitivity", this.appState.controls.mouseSensitivity);
@@ -689,6 +707,18 @@ export class BlueMapApp {
         let value = getLocalStorage("bluemap-" + key);
 
         if (value === undefined) return defaultValue;
+        return value;
+    }
+
+    /**
+     * Keeps a stored view-distance inside the range the server currently advertises. The slider
+     * itself can only produce values in that range, so anything outside it is stale - and leaving
+     * it there would mean lowering the configured maximum has no effect on existing visitors.
+     */
+    clampToSlider(value, min, max) {
+        if (isNaN(value)) return value;
+        if (!isNaN(min)) value = Math.max(value, min);
+        if (!isNaN(max)) value = Math.min(value, max);
         return value;
     }
 
