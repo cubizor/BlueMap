@@ -49,6 +49,9 @@ public class WebFilesManager {
             //.setPrettyPrinting() // enable pretty printing for easy editing
             .create();
 
+    /** Records which build the extracted web-app files came from; see filesNeedUpdate(). */
+    private static final String WEBAPP_VERSION_FILE = ".webapp-version";
+
     private final Path webRoot;
     private Settings settings;
 
@@ -104,7 +107,13 @@ public class WebFilesManager {
     }
 
     public boolean filesNeedUpdate() {
-        return !Files.exists(webRoot.resolve("index.html"));
+        // Upstream only re-extracts when index.html is missing. That holds when the web root is
+        // scratch space, but ours lives on a persistent volume that survives a new image - so a
+        // build shipping a changed web-app silently kept serving the old one. (In prod that hid a
+        // whole feature for two weeks.) Stamp the extracted files with the build they came from and
+        // re-extract whenever that no longer matches.
+        if (!Files.exists(webRoot.resolve("index.html"))) return true;
+        return !webappVersion().equals(installedWebappVersion());
     }
 
     public void updateFiles() throws IOException {
@@ -114,6 +123,25 @@ public class WebFilesManager {
         // extract zip to webroot
         Files.createDirectories(webRoot);
         FileHelper.extractZipFile(zippedWebapp, webRoot, StandardCopyOption.REPLACE_EXISTING);
+
+        // written last: if the extraction fails half-way, the stamp still says "old", so the next
+        // start retries rather than trusting a partial web root
+        Files.writeString(webRoot.resolve(WEBAPP_VERSION_FILE), webappVersion(),
+                StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING);
+    }
+
+    /** Identifies the build the bundled web-app came from. The git hash alone would be enough for a
+     * release build, but is "DEV" for a local one, where the version is what varies. */
+    private String webappVersion() {
+        return BlueMap.VERSION + " " + BlueMap.GIT_HASH;
+    }
+
+    private String installedWebappVersion() {
+        try {
+            return Files.readString(webRoot.resolve(WEBAPP_VERSION_FILE)).trim();
+        } catch (IOException ex) {
+            return "";  // no stamp: a web root extracted before this existed, so it is stale
+        }
     }
 
     @SuppressWarnings({"FieldMayBeFinal", "FieldCanBeLocal", "unused", "MismatchedQueryAndUpdateOfCollection"})
